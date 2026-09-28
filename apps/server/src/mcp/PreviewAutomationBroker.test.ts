@@ -906,6 +906,23 @@ it.effect("does not treat a newly connected viewer as the focused client", () =>
   ),
 );
 
+it.effect("keeps a pinned session in place when no displaying client was focused", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const broker = yield* makeBroker;
+      const report = yield* connectViewerHosts(broker, ["early", "late"]);
+      expect(
+        yield* broker.invoke<string>({ scope, tabId: discordTab, operation: "open", input: {} }),
+      ).toBe("late");
+      yield* report("early", true, false);
+      yield* report("late", true, false);
+      expect(yield* broker.invoke<string>({ scope, operation: "snapshot", input: {} })).toBe(
+        "late",
+      );
+    }),
+  ),
+);
+
 it.effect("keeps a pinned session in place for a request that targets another tab", () =>
   Effect.scoped(
     Effect.gen(function* () {

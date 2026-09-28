@@ -524,7 +524,12 @@ export const make = Effect.gen(function* PreviewAutomationBrokerMake() {
                       tab.visible === true,
                   ),
               )
-              .sort((left, right) => right.lastFocusedOrder - left.lastFocusedOrder)[0]
+              .sort(
+                (left, right) =>
+                  right.lastFocusedOrder - left.lastFocusedOrder ||
+                  Number(right.clientId === assignedConnection?.clientId) -
+                    Number(left.clientId === assignedConnection?.clientId),
+              )[0]
           : undefined;
       const movesToViewer =
         viewer !== undefined && viewer.clientId !== assignedConnection?.clientId;
