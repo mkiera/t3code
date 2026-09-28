@@ -865,9 +865,11 @@ it.effect("moves a pinned session to the client where the user is viewing its ta
         "desktop",
       );
 
+      yield* report("vm", true, false);
       yield* report("vm", true, true);
       expect(yield* broker.invoke<string>({ scope, operation: "click", input: {} })).toBe("vm");
 
+      yield* report("desktop", true, false);
       yield* report("desktop", true, true);
       expect(yield* broker.invoke<string>({ scope, operation: "click", input: {} })).toBe(
         "desktop",
@@ -899,6 +901,30 @@ it.effect("does not treat a newly connected viewer as the focused client", () =>
 
       const reportLate = yield* connectViewerHosts(broker, ["late"]);
       yield* reportLate("late", true, false);
+      expect(yield* broker.invoke<string>({ scope, operation: "snapshot", input: {} })).toBe(
+        "desktop",
+      );
+    }),
+  ),
+);
+
+it.effect("does not treat a focused client's tab update as new focus", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const broker = yield* makeBroker;
+      const report = yield* connectViewerHosts(broker, ["vm", "desktop"]);
+      yield* report("desktop", false, false);
+      yield* report("vm", false, true);
+      expect(
+        yield* broker.invoke<string>({ scope, tabId: discordTab, operation: "open", input: {} }),
+      ).toBe("vm");
+      yield* report("vm", true, true);
+      yield* report("desktop", true, true);
+      expect(yield* broker.invoke<string>({ scope, operation: "snapshot", input: {} })).toBe(
+        "desktop",
+      );
+
+      yield* report("vm", true, true);
       expect(yield* broker.invoke<string>({ scope, operation: "snapshot", input: {} })).toBe(
         "desktop",
       );

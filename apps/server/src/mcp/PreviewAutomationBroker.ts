@@ -438,7 +438,9 @@ export const make = Effect.gen(function* PreviewAutomationBrokerMake() {
         focused: host.focused,
         liveTabs: host.liveTabs ?? currentHost.liveTabs,
         focusOrder: host.focused ? focusSequence : currentHost.focusOrder,
-        lastFocusedOrder: host.focused ? focusSequence : currentHost.lastFocusedOrder,
+        // Focused clients re-report on every tab change, so only gaining focus counts as the user's latest choice.
+        lastFocusedOrder:
+          host.focused && !currentHost.focused ? focusSequence : currentHost.lastFocusedOrder,
       });
       return { ...current, clients, focusSequence };
     });
