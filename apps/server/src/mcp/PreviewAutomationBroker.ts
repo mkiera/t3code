@@ -75,6 +75,7 @@ interface ClientConnection {
   readonly focused: boolean;
   readonly liveTabs: NonNullable<PreviewAutomationHostFocus["liveTabs"]>;
   readonly focusOrder: number;
+  readonly lastFocusedOrder: number;
   readonly queue: Queue.Queue<PreviewAutomationStreamEvent, Cause.Done>;
 }
 
@@ -379,6 +380,7 @@ export const make = Effect.gen(function* PreviewAutomationBrokerMake() {
       focused: false,
       liveTabs: [],
       focusOrder: 0,
+      lastFocusedOrder: 0,
       queue,
     };
     const registration = yield* SynchronizedRef.modify(state, (current) => {
@@ -436,6 +438,7 @@ export const make = Effect.gen(function* PreviewAutomationBrokerMake() {
         focused: host.focused,
         liveTabs: host.liveTabs ?? currentHost.liveTabs,
         focusOrder: host.focused ? focusSequence : currentHost.focusOrder,
+        lastFocusedOrder: host.focused ? focusSequence : currentHost.lastFocusedOrder,
       });
       return { ...current, clients, focusSequence };
     });
@@ -504,9 +507,11 @@ export const make = Effect.gen(function* PreviewAutomationBrokerMake() {
             (!visibleOnly || tab.visible === true) &&
             (input.tabId === undefined || tab.tabId === input.tabId),
         );
-      const targetTabId = input.tabId ?? assigned?.tabId;
+      const assignedTabId = assigned?.tabId;
       const viewer =
-        hasLiveAssignment && targetTabId !== undefined
+        hasLiveAssignment &&
+        assignedTabId !== undefined &&
+        (input.tabId === undefined || input.tabId === assignedTabId)
           ? Array.from(current.clients.values())
               .filter(
                 (host) =>
@@ -515,11 +520,11 @@ export const make = Effect.gen(function* PreviewAutomationBrokerMake() {
                   host.liveTabs.some(
                     (tab) =>
                       tab.threadId === input.scope.threadId &&
-                      tab.tabId === targetTabId &&
+                      tab.tabId === assignedTabId &&
                       tab.visible === true,
                   ),
               )
-              .sort((left, right) => right.focusOrder - left.focusOrder)[0]
+              .sort((left, right) => right.lastFocusedOrder - left.lastFocusedOrder)[0]
           : undefined;
       const movesToViewer =
         viewer !== undefined && viewer.clientId !== assignedConnection?.clientId;
