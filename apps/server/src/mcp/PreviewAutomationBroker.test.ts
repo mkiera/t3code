@@ -811,6 +811,68 @@ it.effect("prefers the live tab owner for new sessions without moving existing l
   ),
 );
 
+it.effect("moves a pinned session to the client where the user is viewing its tab", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const broker = yield* makeBroker;
+      const connections = new Map<string, string>();
+      for (const clientId of ["vm", "desktop"]) {
+        const requests = requestsFrom(
+          yield* broker.connect(makeHost({ clientId })),
+          (connectionId) => connections.set(clientId, connectionId),
+        );
+        yield* Stream.runForEach(requests, (request) =>
+          broker.respond({
+            clientId,
+            connectionId: request.connectionId,
+            requestId: request.requestId,
+            ok: true,
+            result: clientId,
+          }),
+        ).pipe(Effect.forkScoped);
+      }
+      yield* Effect.yieldNow;
+      const tabId = PreviewTabId.make("discord");
+      const report = (clientId: string, visible: boolean, focused: boolean, shownTab = tabId) =>
+        broker.focusHost({
+          clientId,
+          environmentId: scope.environmentId,
+          connectionId: connections.get(clientId)!,
+          focused,
+          liveTabs: [{ threadId: scope.threadId, tabId: shownTab, visible }],
+        });
+
+      yield* report("desktop", false, false);
+      yield* report("vm", false, true);
+      expect(yield* broker.invoke<string>({ scope, tabId, operation: "open", input: {} })).toBe(
+        "vm",
+      );
+
+      yield* report("desktop", true, true, PreviewTabId.make("other-tab"));
+      expect(yield* broker.invoke<string>({ scope, operation: "snapshot", input: {} })).toBe("vm");
+
+      yield* report("desktop", true, true);
+      expect(yield* broker.invoke<string>({ scope, operation: "snapshot", input: {} })).toBe(
+        "desktop",
+      );
+
+      yield* report("vm", true, true);
+      expect(yield* broker.invoke<string>({ scope, operation: "click", input: {} })).toBe("vm");
+
+      yield* report("desktop", true, true);
+      expect(yield* broker.invoke<string>({ scope, operation: "click", input: {} })).toBe(
+        "desktop",
+      );
+
+      yield* report("desktop", false, false);
+      yield* report("vm", false, true);
+      expect(yield* broker.invoke<string>({ scope, operation: "evaluate", input: {} })).toBe(
+        "desktop",
+      );
+    }),
+  ),
+);
+
 it.effect("prefers a focused host over unrelated extra capabilities for a new session", () =>
   Effect.scoped(
     Effect.gen(function* () {
